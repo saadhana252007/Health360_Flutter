@@ -1,10 +1,15 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health360ai/app/router.dart';
 import 'package:health360ai/data/models/profile.dart';
 import 'package:health360ai/data/models/symptoms_vitals.dart';
 import 'package:health360ai/data/models/checkup_summary.dart';
 import 'package:health360ai/data/models/checkup_detail.dart';
 import 'package:health360ai/data/models/checkup_response.dart';
+import 'package:health360ai/features/auth/login_screen.dart';
+import 'package:health360ai/features/auth/register_screen.dart';
+import 'package:health360ai/features/auth/reset_password_screen.dart';
 import 'package:health360ai/state/checkup_draft_provider.dart';
 
 void main() {
@@ -90,11 +95,11 @@ void main() {
         complaintType: 'general',
         severity: 5.0,
         durationDays: 3.0,
-        frequency: 2.0,  // Occasionally
+        frequency: 2.0, // Occasionally
         progression: 1.0, // Same
         site: 'chest',
-        character: 1.0,  // Sharp
-        trigger: 2.0,    // 2 triggers ticked
+        character: 1.0, // Sharp
+        trigger: 2.0, // 2 triggers ticked
         associatedSymptoms: ['fatigue', 'nausea'],
         preSymptoms: [],
         postSymptoms: ['dizziness'],
@@ -246,10 +251,7 @@ void main() {
     test('parses a minimal response (only required fields)', () {
       final json = {
         'status': 'success',
-        'assessment': {
-          'finding': 'No acute pathology',
-          'confidence': 0.85,
-        },
+        'assessment': {'finding': 'No acute pathology', 'confidence': 0.85},
       };
       final cr = CheckupResponse.fromJson(json);
 
@@ -516,7 +518,10 @@ void main() {
           weightKg: 58,
         ),
       );
-      expect(container.read(checkupDraftProvider).patient?.fullName, 'Jane Doe');
+      expect(
+        container.read(checkupDraftProvider).patient?.fullName,
+        'Jane Doe',
+      );
 
       // Set vitals
       notifier.setVitals(
@@ -540,7 +545,10 @@ void main() {
       // Clear image
       notifier.clearImage();
       expect(container.read(checkupDraftProvider).hasImage, isFalse);
-      expect(container.read(checkupDraftProvider).patient?.fullName, 'Jane Doe');
+      expect(
+        container.read(checkupDraftProvider).patient?.fullName,
+        'Jane Doe',
+      );
 
       // Clear entire draft
       notifier.clear();
@@ -584,6 +592,141 @@ void main() {
     test('tobacco/alcohol: No=0, Yes=1', () {
       expect(0, equals(0));
       expect(1, equals(1));
+    });
+  });
+
+  // ── Item 3: Route Contracts ────────────────────────────────────────────────
+
+  group('Item 3: Route Contracts', () {
+    test('AppRoutes match migration plan and deep link specifications', () {
+      expect(AppRoutes.splash, equals('/'));
+      expect(AppRoutes.login, equals('/login'));
+      expect(AppRoutes.register, equals('/register'));
+      expect(AppRoutes.resetPassword, equals('/login/reset'));
+      expect(AppRoutes.home, equals('/home'));
+    });
+  });
+
+  // ── Item 3a: LoginScreen ───────────────────────────────────────────────────
+
+  group('Item 3a: LoginScreen', () {
+    testWidgets('renders login UI elements matching activity_main.xml', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: LoginScreen())),
+      );
+
+      expect(find.text('Health360'), findsOneWidget);
+      expect(find.text('AI'), findsOneWidget);
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(
+        find.text('Sign in to continue your personalized health checkup'),
+        findsOneWidget,
+      );
+      expect(find.text('Email address'), findsOneWidget);
+      expect(find.text('Password'), findsOneWidget);
+      expect(find.text('Forgot password?'), findsOneWidget);
+      expect(find.text('Sign In  →'), findsOneWidget);
+      expect(
+        find.text("Don't have an account?  Create account"),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Your health data is securely protected'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('empty email triggers "Enter your email" message', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: LoginScreen())),
+      );
+
+      final signInBtn = find.text('Sign In  →');
+      await tester.tap(signInBtn);
+      await tester.pump();
+
+      expect(find.text('Enter your email'), findsAtLeast(1));
+    });
+  });
+
+  // ── Item 3b: RegisterScreen ────────────────────────────────────────────────
+
+  group('Item 3b: RegisterScreen', () {
+    testWidgets('renders registration UI matching activity_register.xml', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: RegisterScreen())),
+      );
+
+      expect(find.text('Health360'), findsOneWidget);
+      expect(find.text('Create your account'), findsOneWidget);
+      expect(find.text('Personal Details'), findsOneWidget);
+      expect(find.text('Full Name'), findsOneWidget);
+      expect(find.text('Date of Birth'), findsOneWidget);
+      expect(find.text('Sex'), findsOneWidget);
+      expect(find.text('Height'), findsOneWidget);
+      expect(find.text('Weight'), findsOneWidget);
+      expect(find.text('Account Credentials'), findsOneWidget);
+      expect(find.text('Email address'), findsOneWidget);
+      expect(find.text('Password'), findsOneWidget);
+      expect(find.text('Confirm Password'), findsOneWidget);
+      expect(
+        find.text('I agree to the Terms of Service and Privacy Policy'),
+        findsOneWidget,
+      );
+      expect(find.text('Create Account  →'), findsOneWidget);
+      expect(find.text('Already have an account?  Login'), findsOneWidget);
+    });
+
+    testWidgets('empty full name triggers "Enter your full name"', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: RegisterScreen())),
+      );
+
+      final createBtn = find.text('Create Account  →');
+      await tester.ensureVisible(createBtn);
+      await tester.tap(createBtn);
+      await tester.pump();
+
+      expect(find.text('Enter your full name'), findsAtLeast(1));
+    });
+  });
+
+  // ── Item 3c: ResetPasswordScreen ───────────────────────────────────────────
+
+  group('Item 3c: ResetPasswordScreen', () {
+    testWidgets('renders reset password UI matching specifications', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: ResetPasswordScreen())),
+      );
+
+      expect(find.text('Reset Password'), findsOneWidget);
+      expect(find.text('Enter your new Health360 password.'), findsOneWidget);
+      expect(find.text('New Password'), findsOneWidget);
+      expect(find.text('Confirm Password'), findsOneWidget);
+      expect(find.text('Update Password'), findsOneWidget);
+      expect(find.text('Back to Login'), findsOneWidget);
+    });
+
+    testWidgets('empty password triggers "Enter a password"', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: ResetPasswordScreen())),
+      );
+
+      final updateBtn = find.text('Update Password');
+      await tester.tap(updateBtn);
+      await tester.pump();
+
+      expect(find.text('Enter a password'), findsAtLeast(1));
     });
   });
 }

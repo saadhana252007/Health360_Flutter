@@ -221,9 +221,9 @@ Item <N>: <name>. Kotlin files: <paths>. Read them first, then implement in ./he
 
 - [x] 1. Flutter scaffold, theme, router + auth guard, config, Android manifests
 - [x] 2. Models, Supabase client, dio client (token + refresh), repositories, `CheckupDraft`, `/health` smoke test
-- [ ] 3a. Login
-- [ ] 3b. Register (with Q1 fix)
-- [ ] 3c. Forgot password + Reset password (deep link)
+- [x] 3a. Login
+- [x] 3b. Register (with Q1 fix)
+- [x] 3c. Forgot password + Reset password (deep link)
 - [ ] 4a. Bottom-nav shell + Home
 - [ ] 4b. Profile
 - [ ] 5a. Patient info

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../features/auth/login_screen.dart';
+import '../features/auth/register_screen.dart';
 import '../features/auth/reset_password_screen.dart';
 import '../features/auth/splash_screen.dart';
 import '../features/shell/home_shell.dart';
@@ -13,6 +15,7 @@ import '../state/auth_provider.dart';
 abstract final class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
+  static const String register = '/register';
 
   /// Opened by the `health360://login/reset` deep link.
   static const String resetPassword = '/login/reset';
@@ -24,12 +27,17 @@ abstract final class AppRoutes {
 
 /// Provides a [GoRouter] whose [GoRouter.redirect] enforces authentication.
 ///
-/// - Unauthenticated users are always sent to [AppRoutes.login].
+/// - Unauthenticated users can only access [AppRoutes.login] and [AppRoutes.register].
 /// - Authenticated users are redirected away from auth routes to [AppRoutes.home].
+/// - Password recovery sessions are routed to [AppRoutes.resetPassword] and
+///   are never redirected to [AppRoutes.home].
 /// - While the session is still loading the splash screen is shown.
 final routerProvider = Provider<GoRouter>((ref) {
+  // Activate the listener so recovery events are tracked.
+  ref.watch(authStateListenerProvider);
+
   // Keep a Listenable that GoRouter can use to re-evaluate the redirect
-  // whenever the session changes.
+  // whenever the session or recovery state changes.
   final authListenable = _AuthListenable(ref);
 
   return GoRouter(
@@ -37,10 +45,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: authListenable,
 
     // ── Deep-link prefix for `health360://` scheme ────────────────────────────
-    // GoRouter matches URIs, so we register the deep-link base here.
-    // The Android intent filter (in AndroidManifest.xml) routes the URI into
-    // the app; GoRouter then matches the path `/login/reset`.
-
+    // The Android intent filter routes the URI into the app; GoRouter matches
+    // the path `/login/reset`.
     redirect: (BuildContext context, GoRouterState state) {
       final sessionAsync = ref.read(authSessionProvider);
 
@@ -50,23 +56,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       final isAuthenticated = sessionAsync.valueOrNull != null;
+      final isRecovery = ref.read(isPasswordRecoveryProvider);
       final location = state.matchedLocation;
 
-      // Deep-link: always allow the reset-password screen regardless of auth
-      // state, because the user arrives with a recovery session (not a normal
-      // session) — the ResetPasswordScreen must handle that distinction.
+      // Deep-link / Password Recovery handling:
+      // Always allow reset-password screen; if in recovery mode, never redirect to home.
       if (location == AppRoutes.resetPassword) {
         return null;
       }
+      if (isRecovery) {
+        return AppRoutes.resetPassword;
+      }
 
       if (!isAuthenticated) {
-        // Unauthenticated — send to login (but not if already there).
-        if (location == AppRoutes.login) return null;
+        // Unauthenticated — allow login and register screens.
+        if (location == AppRoutes.login || location == AppRoutes.register) {
+          return null;
+        }
         return AppRoutes.login;
       }
 
-      // Authenticated — redirect away from auth screens.
-      if (location == AppRoutes.login || location == AppRoutes.splash) {
+      // Authenticated with a normal session — redirect away from auth screens.
+      if (location == AppRoutes.login ||
+          location == AppRoutes.register ||
+          location == AppRoutes.splash) {
         return AppRoutes.home;
       }
 
@@ -83,14 +96,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, _) => const LoginScreen(),
       ),
       GoRoute(
-        // Also matched when the deep link `health360://login/reset` arrives.
+        path: AppRoutes.register,
+        builder: (context, _) => const RegisterScreen(),
+      ),
+      GoRoute(
+        // Matched when the deep link `health360://login/reset` arrives.
         path: AppRoutes.resetPassword,
         builder: (context, _) => const ResetPasswordScreen(),
       ),
-      GoRoute(
-        path: AppRoutes.home,
-        builder: (context, _) => const HomeShell(),
-      ),
+      GoRoute(path: AppRoutes.home, builder: (context, _) => const HomeShell()),
     ],
   );
 });
@@ -98,9 +112,13 @@ final routerProvider = Provider<GoRouter>((ref) {
 // ── Internal helper ───────────────────────────────────────────────────────────
 
 /// A [Listenable] that notifies GoRouter whenever [authSessionProvider]
-/// emits a new value (sign-in, sign-out, token refresh, etc.).
+/// or [isPasswordRecoveryProvider] emits a new value.
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(Ref ref) {
-    ref.listen(authSessionProvider, (_, next) => notifyListeners());
+    ref.listen<AsyncValue<Session?>>(
+      authSessionProvider,
+      (_, _) => notifyListeners(),
+    );
+    ref.listen<bool>(isPasswordRecoveryProvider, (_, _) => notifyListeners());
   }
 }
