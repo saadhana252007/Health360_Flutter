@@ -1,3 +1,5 @@
+import 'checkup_detail.dart';
+
 // Mirrors the full API response types from `data/remote/ApiModels.kt`.
 // The Flutter client parses the response from:
 //   POST /api/v1/checkups/analyze
@@ -52,6 +54,124 @@ class CheckupResponse {
           : null,
     );
   }
+
+  /// Builds a [CheckupResponse] from a stored Supabase [CheckupDetail] row.
+  ///
+  /// Replicates `buildCheckupResponse` in Android `ResultActivity.kt`.
+  factory CheckupResponse.fromDetail(CheckupDetail detail) {
+    final imageResult = detail.imageResult != null
+        ? ImageResult.fromJson(detail.imageResult!)
+        : null;
+
+    final symptomResult = detail.symptomResult != null
+        ? ModelResult.fromJson(detail.symptomResult!)
+        : const ModelResult();
+
+    final patientResult = detail.patientResult != null
+        ? ModelResult.fromJson(detail.patientResult!)
+        : const ModelResult();
+
+    final uncertainty = detail.uncertaintyData != null
+        ? UncertaintyResult.fromJson(detail.uncertaintyData!)
+        : UncertaintyResult(
+            confidence: detail.confidence ?? detail.overallScore,
+            uncertainty: detail.uncertainty ?? 0.0,
+            completeness: detail.completeness ?? 0.0,
+          );
+
+    final screening = detail.screening != null
+        ? ScreeningInterpretation.fromJson(detail.screening!)
+        : _buildHistoricalScreening(
+            detail,
+            symptomResult,
+            patientResult,
+            imageResult,
+          );
+
+    final assessment = Assessment(
+      imageType: imageResult?.type,
+      finding: imageResult?.prediction?.className,
+      confidence: imageResult?.prediction?.confidence,
+      probabilities: imageResult?.prediction?.probabilities ?? const {},
+    );
+
+    return CheckupResponse(
+      status: detail.status,
+      assessment: assessment,
+      screening: screening,
+      imageResult: imageResult,
+      symptomResult: symptomResult,
+      patientResult: patientResult,
+      uncertainty: uncertainty,
+    );
+  }
+}
+
+ScreeningInterpretation _buildHistoricalScreening(
+  CheckupDetail detail,
+  ModelResult symptomResult,
+  ModelResult patientResult,
+  ImageResult? imageResult,
+) {
+  final explanations = <String>[];
+
+  if (symptomResult.className != null) {
+    final conf = symptomResult.confidence != null
+        ? '${(symptomResult.confidence! * 100).toStringAsFixed(0)}%'
+        : '—';
+    explanations.add(
+      'Symptom model: ${_formatHistoricalLabel(symptomResult.className!)} with $conf AI confidence.',
+    );
+  }
+
+  if (patientResult.className != null) {
+    final conf = patientResult.confidence != null
+        ? '${(patientResult.confidence! * 100).toStringAsFixed(0)}%'
+        : '—';
+    explanations.add(
+      'Patient-risk model: ${_formatHistoricalLabel(patientResult.className!)} with $conf AI confidence.',
+    );
+  }
+
+  final imgPred = imageResult?.prediction;
+  if (imgPred?.className != null) {
+    final conf = imgPred!.confidence != null
+        ? '${(imgPred.confidence! * 100).toStringAsFixed(0)}%'
+        : '—';
+    explanations.add(
+      'Image model: ${_formatHistoricalLabel(imgPred.className!)} with $conf AI confidence.',
+    );
+  }
+
+  if (explanations.isEmpty) {
+    explanations.add(
+      'The recorded AI model outputs were used as part of this screening.',
+    );
+  }
+
+  final mainConcern =
+      imageResult?.prediction?.className ??
+      symptomResult.className ??
+      detail.overallCategory ??
+      'Health Screening';
+
+  return ScreeningInterpretation(
+    mainConcern: _formatHistoricalLabel(mainConcern),
+    overallStatus: 'SCREENING_COMPLETED',
+    screeningSummary: 'AI-assisted health screening completed using the recorded checkup information.',
+    triage: '',
+    redFlags: const [],
+    vitalsInterpretation: 'The vital signs recorded during this checkup are shown below for reference.',
+    modelExplanations: explanations,
+    nextSteps: 'Review the screening information and seek professional medical advice if symptoms persist, worsen, or cause concern.',
+    overallExplanation: 'This page presents the AI-assisted screening outputs recorded during the selected checkup. These outputs are screening results and are not a medical diagnosis.',
+  );
+}
+
+String _formatHistoricalLabel(String value) {
+  if (value.isEmpty) return value;
+  final spaced = value.replaceAll('_', ' ');
+  return spaced[0].toUpperCase() + spaced.substring(1);
 }
 
 class Assessment {

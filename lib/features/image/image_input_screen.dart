@@ -5,7 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../app/router.dart';
+import '../../core/api_client.dart';
+import '../../data/repositories/checkup_repo.dart';
 import '../../state/checkup_draft_provider.dart';
+import '../result/result_screen.dart';
 
 /// Image Input screen replicating Android `ImageInputActivity.kt` and `activity_image_input.xml`.
 class ImageInputScreen extends ConsumerStatefulWidget {
@@ -23,6 +27,7 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
 
   String? _selectedImageType;
   String? _selectedImagePath;
+  bool _isSubmitting = false;
 
   final List<String> _imageTypeOptions = const ['Skin', 'Oral', 'Wound'];
 
@@ -78,19 +83,14 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
   }
 
   void _skipImage() {
+    if (_isSubmitting) return;
     _clearImage();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Continuing without image analysis... Checkup is ready for submission in Item 6.',
-        ),
-        duration: Duration(seconds: 3),
-      ),
-    );
+    _performSubmission(hasImage: false);
   }
 
   void _continueToSubmission() {
+    if (_isSubmitting) return;
+
     final type = _selectedImageType?.trim() ?? '';
     final path = _selectedImagePath;
 
@@ -108,14 +108,65 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
         .read(checkupDraftProvider.notifier)
         .setImage(path: path, imageType: type.toLowerCase());
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Image saved. Checkup is ready for submission in Item 6.',
+    _performSubmission(hasImage: true);
+  }
+
+  Future<void> _performSubmission({required bool hasImage}) async {
+    setState(() => _isSubmitting = true);
+
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            hasImage
+                ? 'Analyzing your checkup...'
+                : 'Continuing without image analysis...',
+          ),
+          duration: const Duration(seconds: 2),
         ),
-        duration: Duration(seconds: 3),
-      ),
-    );
+      );
+
+    try {
+      final draft = ref.read(checkupDraftProvider);
+      if (draft.patient == null ||
+          draft.symptoms == null ||
+          draft.vitals == null) {
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
+      final repo = ref.read(checkupRepositoryProvider);
+
+      final response = await repo.submitCheckup(draft);
+
+      // Preserve vitals & symptoms for display before clearing draft
+      final vitals = draft.vitals?.toJson();
+      final symptoms = draft.symptoms;
+
+      // Submission successful: clear the draft
+      ref.read(checkupDraftProvider.notifier).clear();
+
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        context.push(
+          AppRoutes.result,
+          extra: ResultScreenArgs(
+            response: response,
+            vitals: vitals,
+            symptoms: symptoms,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        final message = e is ApiException
+            ? e.message
+            : e.toString().replaceFirst('Exception: ', '');
+        _showError(message);
+      }
+    }
   }
 
   void _showError(String message) {
@@ -280,7 +331,9 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton.icon(
-                  onPressed: () => _pickImage(ImageSource.camera),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => _pickImage(ImageSource.camera),
                   icon: const Icon(Icons.camera_alt_outlined),
                   label: const Text(
                     'Take Photo',
@@ -303,7 +356,9 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton.icon(
-                  onPressed: () => _pickImage(ImageSource.gallery),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => _pickImage(ImageSource.gallery),
                   icon: const Icon(Icons.photo_library_outlined),
                   label: const Text(
                     'Choose from Gallery',
@@ -326,7 +381,7 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _skipImage,
+                  onPressed: _isSubmitting ? null : _skipImage,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE8F2F2),
                     foregroundColor: const Color(0xFF006B6F),
@@ -348,7 +403,7 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _continueToSubmission,
+                  onPressed: _isSubmitting ? null : _continueToSubmission,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF006B6F),
                     foregroundColor: Colors.white,
@@ -357,10 +412,22 @@ class _ImageInputScreenState extends ConsumerState<ImageInputScreen> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),

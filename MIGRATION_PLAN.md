@@ -230,10 +230,10 @@ Item <N>: <name>. Kotlin files: <paths>. Read them first, then implement in ./he
 - [x] 5b. Symptoms
 - [x] 5c. Vitals
 - [x] 5d. Image input
-- [ ] 6a. Submit (with and without image)
-- [ ] 6b. Result screen (live + stored)
-- [ ] 7a. History
-- [ ] 7b. Assistant
+- [x] 6a. Submit (with and without image)
+- [x] 6b. Result screen (live + stored)
+- [x] 7a. History
+- [x] 7b. Assistant
 - [ ] 8. HTTPS, release build, tests, cleanup
 
 ---

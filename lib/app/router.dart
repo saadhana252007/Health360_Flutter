@@ -3,13 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/models/checkup_response.dart';
+import '../features/assistant/assistant_screen.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/reset_password_screen.dart';
 import '../features/auth/splash_screen.dart';
+import '../features/history/history_screen.dart';
 import '../features/image/image_input_screen.dart';
 import '../features/patient/patient_info_screen.dart';
+import '../features/result/result_screen.dart';
 import '../features/shell/home_shell.dart';
+import '../features/submission/submission_screen.dart';
 import '../features/symptoms/symptoms_screen.dart';
 import '../features/vitals/vitals_screen.dart';
 import '../state/auth_provider.dart';
@@ -25,10 +30,14 @@ abstract final class AppRoutes {
   static const String resetPassword = '/login/reset';
 
   static const String home = '/home';
+  static const String history = '/history';
+  static const String assistant = '/assistant';
   static const String patientInfo = '/checkup/patient';
   static const String symptoms = '/checkup/symptoms';
   static const String vitals = '/checkup/vitals';
   static const String imageInput = '/checkup/image';
+  static const String submission = '/checkup/submission';
+  static const String result = '/checkup/result';
 }
 
 // ── Router provider ───────────────────────────────────────────────────────────
@@ -114,6 +123,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: AppRoutes.home, builder: (context, _) => const HomeShell()),
       GoRoute(
+        path: AppRoutes.history,
+        builder: (context, _) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.assistant,
+        builder: (context, state) =>
+            AssistantScreen(checkupId: state.uri.queryParameters['checkup_id']),
+      ),
+      GoRoute(
         path: AppRoutes.patientInfo,
         builder: (context, state) => PatientInfoScreen(
           editFromProfile:
@@ -131,6 +149,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.imageInput,
         builder: (context, _) => const ImageInputScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.submission,
+        builder: (context, _) => const SubmissionScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.result,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is ResultScreenArgs) {
+            return ResultScreen(
+              response: extra.response,
+              checkupId:
+                  extra.checkupId ?? state.uri.queryParameters['checkup_id'],
+              vitals: extra.vitals,
+              symptoms: extra.symptoms,
+            );
+          } else if (extra is CheckupResponse) {
+            return ResultScreen(
+              response: extra,
+              checkupId: state.uri.queryParameters['checkup_id'],
+            );
+          }
+          return ResultScreen(
+            checkupId: state.uri.queryParameters['checkup_id'],
+          );
+        },
       ),
     ],
   );

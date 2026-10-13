@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../assistant/assistant_screen.dart';
+import '../history/history_screen.dart';
 import '../home/home_screen.dart';
 import '../profile/profile_screen.dart';
 
@@ -28,8 +30,8 @@ class HomeShell extends ConsumerWidget {
           index: activeTab,
           children: const [
             HomeScreen(),
-            _HistoryTabPlaceholder(),
-            _AssistantTabPlaceholder(),
+            HistoryScreen(),
+            AssistantScreen(),
             ProfileScreen(),
           ],
         ),
@@ -74,148 +76,6 @@ class HomeShell extends ConsumerWidget {
                 activeIcon: Icon(Icons.person),
                 label: 'Profile',
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HistoryTabPlaceholder extends StatelessWidget {
-  const _HistoryTabPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FB),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Checkup History',
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF12343B),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'View your past screening assessments',
-                style: TextStyle(fontSize: 13, color: Color(0xFF718083)),
-              ),
-              const Spacer(),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEFF4FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.history,
-                        size: 32,
-                        color: Color(0xFF006B6F),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'History Coming Soon',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF12343B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Checkup history and past results will be available in item 7a.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Color(0xFF718083)),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AssistantTabPlaceholder extends StatelessWidget {
-  const _AssistantTabPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FB),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Health360 AI Assistant',
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF12343B),
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Ask questions about your health screening results',
-                style: TextStyle(fontSize: 13, color: Color(0xFF718083)),
-              ),
-              const Spacer(),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEFF4FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.chat_bubble_outline,
-                        size: 32,
-                        color: Color(0xFF006B6F),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'AI Assistant Coming Soon',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF12343B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Interactive assistant chat will be available in item 7b.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Color(0xFF718083)),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
             ],
           ),
         ),

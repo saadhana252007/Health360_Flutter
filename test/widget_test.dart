@@ -18,6 +18,16 @@ import 'package:health360ai/features/patient/patient_info_screen.dart';
 import 'package:health360ai/features/profile/profile_screen.dart';
 import 'package:health360ai/features/symptoms/symptoms_screen.dart';
 import 'package:health360ai/features/vitals/vitals_screen.dart';
+import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
+import 'package:health360ai/core/api_client.dart';
+import 'package:health360ai/data/repositories/checkup_repo.dart';
+import 'package:health360ai/data/repositories/assistant_repo.dart';
+import 'package:health360ai/features/assistant/assistant_screen.dart';
+import 'package:health360ai/features/history/history_screen.dart';
+import 'package:health360ai/features/result/result_screen.dart';
+import 'package:health360ai/features/submission/submission_screen.dart';
+import 'package:health360ai/state/auth_provider.dart';
 import 'package:health360ai/state/checkup_draft_provider.dart';
 
 void main() {
@@ -1047,6 +1057,11 @@ void main() {
           path: AppRoutes.imageInput,
           builder: (_, _) => const SizedBox(),
         ),
+        GoRoute(
+          path: AppRoutes.submission,
+          builder: (_, _) => const SizedBox(),
+        ),
+        GoRoute(path: AppRoutes.result, builder: (_, _) => const SizedBox()),
       ],
     );
 
@@ -1646,4 +1661,915 @@ void main() {
       );
     });
   });
+
+  // ── Item 6: CheckupResponse.fromDetail ──────────────────────────────────────
+
+  group('Item 6: CheckupResponse.fromDetail', () {
+    test('builds CheckupResponse from complete CheckupDetail', () {
+      final detail = CheckupDetail(
+        id: 'chk-1',
+        userId: 'usr-1',
+        status: 'completed',
+        overallScore: 0.88,
+        createdAt: '2026-03-01T12:00:00Z',
+        overallCategory: 'Moderate',
+        confidence: 0.88,
+        uncertainty: 0.12,
+        completeness: 1.0,
+        symptoms: {'complaint_type': 'skin', 'site': 'face', 'severity': 4.0},
+        patientData: {
+          'heart_rate': 72.0,
+          'systolic_bp': 120.0,
+          'diastolic_bp': 80.0,
+          'spo2': 98.0,
+          'temperature': 36.6,
+        },
+        imageResult: {
+          'type': 'skin',
+          'prediction': {
+            'class_index': 1,
+            'class_name': 'Eczema',
+            'confidence': 0.89,
+            'probabilities': {'Eczema': 0.89, 'Psoriasis': 0.11},
+          },
+        },
+        symptomResult: {
+          'class_index': 0,
+          'class_name': 'Dermatitis',
+          'confidence': 0.85,
+        },
+        patientResult: {
+          'class_index': 0,
+          'class_name': 'Low Risk',
+          'confidence': 0.92,
+        },
+        screening: {
+          'main_concern': 'Eczema',
+          'overall_status': 'COMPLETED',
+          'screening_summary': 'Skin screening completed.',
+          'triage': 'Routine evaluation recommended',
+          'red_flags': ['Persistent itching'],
+          'vitals_interpretation': 'Normal vitals',
+          'model_explanations': ['Symptom model: Dermatitis'],
+          'next_steps': 'Consult dermatologist if symptoms persist.',
+          'overall_explanation': 'AI multi-modal screening.',
+        },
+        uncertaintyData: {
+          'confidence': 0.88,
+          'uncertainty': 0.12,
+          'completeness': 1.0,
+        },
+      );
+
+      final response = CheckupResponse.fromDetail(detail);
+
+      expect(response.status, 'completed');
+      expect(response.screening?.mainConcern, 'Eczema');
+      expect(response.screening?.screeningSummary, 'Skin screening completed.');
+      expect(response.screening?.redFlags, contains('Persistent itching'));
+      expect(response.imageResult?.type, 'skin');
+      expect(response.imageResult?.prediction?.className, 'Eczema');
+      expect(response.symptomResult?.className, 'Dermatitis');
+      expect(response.patientResult?.className, 'Low Risk');
+      expect(response.uncertainty?.confidence, 0.88);
+    });
+
+    test(
+      'builds fallback historical screening when detail.screening is null',
+      () {
+        final detail = CheckupDetail(
+          id: 'chk-2',
+          userId: 'usr-1',
+          status: 'completed',
+          overallScore: 0.75,
+          createdAt: '2026-03-01T12:00:00Z',
+          overallCategory: 'Cardiovascular Risk',
+          symptomResult: {'class_name': 'Chest Pain', 'confidence': 0.78},
+          patientResult: {'class_name': 'Moderate Risk', 'confidence': 0.82},
+        );
+
+        final response = CheckupResponse.fromDetail(detail);
+
+        expect(response.screening, isNotNull);
+        expect(response.screening?.overallStatus, 'SCREENING_COMPLETED');
+        expect(
+          response.screening?.screeningSummary,
+          contains('AI-assisted health screening completed'),
+        );
+        expect(response.screening?.modelExplanations.length, 2);
+      },
+    );
+  });
+
+  // ── Item 6a: Submission Screen & Logic ──────────────────────────────────────
+
+  group('Item 6a: Submission flow', () {
+    testWidgets(
+      'SubmissionScreen renders draft summary and handles submission',
+      (tester) async {
+        tester.view.physicalSize = const Size(1080, 2400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final mockRepo = MockCheckupRepository();
+        final container = ProviderContainer(
+          overrides: [checkupRepositoryProvider.overrideWithValue(mockRepo)],
+        );
+
+        // Populate draft
+        container
+            .read(checkupDraftProvider.notifier)
+            .setPatient(
+              const Profile(
+                id: 'p1',
+                fullName: 'Alice Smith',
+                dateOfBirth: '1992-05-10',
+                sex: 'female',
+                heightCm: 168.0,
+                weightKg: 62.0,
+              ),
+            );
+        container
+            .read(checkupDraftProvider.notifier)
+            .setSymptoms(
+              const SymptomsPayload(
+                complaintType: 'general',
+                severity: 3.0,
+                durationDays: 2.0,
+                frequency: 1.0,
+                progression: 1.0,
+                site: 'head',
+                character: 2.0,
+                trigger: 1.0,
+                associatedSymptoms: [],
+                preSymptoms: [],
+                postSymptoms: [],
+              ),
+            );
+        container
+            .read(checkupDraftProvider.notifier)
+            .setVitals(
+              const VitalsPayload(
+                heartRate: 75.0,
+                systolicBp: 120.0,
+                diastolicBp: 80.0,
+                spo2: 98.0,
+                temperature: 36.6,
+                activityLevel: 1,
+                tobacco: 0,
+                alcohol: 0,
+              ),
+            );
+
+        await tester.pumpWidget(
+          buildCheckupTestApp(const SubmissionScreen(), container: container),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Submit Checkup'), findsWidgets);
+        expect(find.textContaining('Alice Smith'), findsOneWidget);
+        expect(find.textContaining('Complaint: general'), findsOneWidget);
+        expect(find.textContaining('Heart Rate: 75.0 bpm'), findsOneWidget);
+        expect(
+          find.textContaining('Skipped (analysis will proceed without image)'),
+          findsOneWidget,
+        );
+
+        // Tap Submit
+        await tester.ensureVisible(find.text('Submit Checkup').last);
+        await tester.tap(find.text('Submit Checkup').last);
+        await tester.pumpAndSettle();
+
+        // Verified: draft is cleared on success
+        expect(container.read(checkupDraftProvider).patient, isNull);
+        expect(container.read(checkupDraftProvider).symptoms, isNull);
+        expect(container.read(checkupDraftProvider).vitals, isNull);
+      },
+    );
+
+    testWidgets('SubmissionScreen retains draft on error', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockRepo = MockCheckupRepository(shouldThrow: true);
+      final container = ProviderContainer(
+        overrides: [checkupRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      container
+          .read(checkupDraftProvider.notifier)
+          .setPatient(
+            const Profile(
+              id: 'p1',
+              fullName: 'Bob Smith',
+              dateOfBirth: '1988-02-14',
+              sex: 'male',
+              heightCm: 175.0,
+              weightKg: 78.0,
+            ),
+          );
+      container
+          .read(checkupDraftProvider.notifier)
+          .setSymptoms(
+            const SymptomsPayload(
+              complaintType: 'skin',
+              severity: 5.0,
+              durationDays: 4.0,
+              frequency: 2.0,
+              progression: 2.0,
+              site: 'face',
+              character: 1.0,
+              trigger: 0.0,
+              associatedSymptoms: [],
+              preSymptoms: [],
+              postSymptoms: [],
+            ),
+          );
+      container
+          .read(checkupDraftProvider.notifier)
+          .setVitals(
+            const VitalsPayload(
+              heartRate: 80.0,
+              systolicBp: 130.0,
+              diastolicBp: 85.0,
+              spo2: 97.0,
+              temperature: 36.8,
+              activityLevel: 1,
+              tobacco: 0,
+              alcohol: 0,
+            ),
+          );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const SubmissionScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Submit Checkup').last);
+      await tester.tap(find.text('Submit Checkup').last);
+      await tester.pumpAndSettle();
+
+      // Error message shown
+      expect(
+        find.textContaining('Submission failed on server'),
+        findsOneWidget,
+      );
+
+      // Verified: draft is NOT cleared on failure
+      expect(
+        container.read(checkupDraftProvider).patient?.fullName,
+        'Bob Smith',
+      );
+      expect(find.text('Retry Submission'), findsOneWidget);
+    });
+  });
+
+  // ── Item 6b: Result Screen ──────────────────────────────────────────────────
+
+  group('Item 6b: ResultScreen', () {
+    testWidgets(
+      'renders live checkup response with all sections and disclaimer',
+      (tester) async {
+        tester.view.physicalSize = const Size(1080, 2400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        const response = CheckupResponse(
+          status: 'completed',
+          assessment: Assessment(
+            imageType: 'skin',
+            finding: 'Eczema',
+            confidence: 0.88,
+            probabilities: {'Eczema': 0.88, 'Normal': 0.12},
+          ),
+          screening: ScreeningInterpretation(
+            mainConcern: 'Eczema',
+            overallStatus: 'COMPLETED',
+            screeningSummary:
+                'Your symptoms and vitals indicate healthy baseline.',
+            triage: 'Routine Care Recommended',
+            redFlags: ['Persistent rash on face'],
+            vitalsInterpretation: 'All vital signs are within healthy limits.',
+            modelExplanations: [
+              'Symptom model: Dermatitis with 85% AI confidence.',
+              'Patient-risk model: Low Risk with 92% AI confidence.',
+            ],
+            nextSteps: 'Moisturize regularly and follow up if redness spreads.',
+            overallExplanation:
+                'Multi-modal AI assessment combining symptoms and vitals.',
+          ),
+          imageResult: ImageResult(
+            type: 'skin',
+            prediction: ImagePrediction(
+              classIndex: 1,
+              className: 'Eczema',
+              confidence: 0.88,
+              probabilities: {'Eczema': 0.88, 'Normal': 0.12},
+            ),
+          ),
+          symptomResult: ModelResult(
+            classIndex: 0,
+            className: 'Dermatitis',
+            confidence: 0.85,
+          ),
+          patientResult: ModelResult(
+            classIndex: 0,
+            className: 'Low Risk',
+            confidence: 0.92,
+          ),
+          uncertainty: UncertaintyResult(
+            confidence: 0.88,
+            uncertainty: 0.12,
+            completeness: 1.0,
+          ),
+        );
+
+        const vitals = {
+          'heart_rate': 72.0,
+          'systolic_bp': 118.0,
+          'diastolic_bp': 78.0,
+          'spo2': 99.0,
+          'temperature': 36.5,
+        };
+
+        const symptoms = SymptomsPayload(
+          complaintType: 'skin',
+          severity: 4.0,
+          durationDays: 3.0,
+          frequency: 2.0,
+          progression: 1.0,
+          site: 'face',
+          character: 1.0,
+          trigger: 0.0,
+          associatedSymptoms: [],
+          preSymptoms: [],
+          postSymptoms: [],
+        );
+
+        await tester.pumpWidget(
+          buildCheckupTestApp(
+            const ResultScreen(
+              response: response,
+              vitals: vitals,
+              symptoms: symptoms,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Header
+        expect(find.text('Your Health Screening'), findsOneWidget);
+        expect(find.text('OVERALL SCREENING'), findsOneWidget);
+        expect(find.text('Completed'), findsOneWidget);
+        expect(
+          find.text('Your symptoms and vitals indicate healthy baseline.'),
+          findsOneWidget,
+        );
+        expect(find.text('Routine Care Recommended'), findsOneWidget);
+
+        // What We Found
+        expect(find.text('WHAT WE FOUND'), findsOneWidget);
+        expect(find.text('Dermatitis'), findsOneWidget);
+        expect(find.text('AI confidence: 85%'), findsOneWidget);
+        expect(find.textContaining('Complaint: Skin'), findsOneWidget);
+
+        // Warning Signs
+        expect(find.text('WARNING SIGNS'), findsOneWidget);
+        expect(find.textContaining('Persistent rash on face'), findsOneWidget);
+
+        // Recorded Vitals
+        expect(find.text('RECORDED VITALS'), findsOneWidget);
+        expect(find.text('72.0 bpm'), findsOneWidget);
+        expect(find.text('118.0/78.0 mmHg'), findsOneWidget);
+        expect(find.text('99.0 %'), findsOneWidget);
+        expect(find.text('36.5 °C'), findsOneWidget);
+
+        // Cardiovascular risk
+        expect(find.text('CARDIOVASCULAR RISK SCREENING'), findsOneWidget);
+        expect(find.text('Low Risk'), findsOneWidget);
+
+        // Image screening
+        expect(find.text('IMAGE SCREENING'), findsOneWidget);
+        expect(find.text('Eczema'), findsWidgets);
+
+        // Quality & Next Steps
+        expect(find.text('ASSESSMENT QUALITY'), findsOneWidget);
+        expect(find.text('100%'), findsOneWidget); // completeness
+        expect(find.text('0.12'), findsOneWidget); // uncertainty
+        expect(find.text('WHAT TO DO NEXT'), findsOneWidget);
+
+        // Non-diagnostic disclaimer
+        expect(
+          find.textContaining(
+            'Health360 AI provides AI-assisted screening information',
+          ),
+          findsOneWidget,
+        );
+
+        // Back to Home button for live results
+        expect(find.text('Back to Home'), findsOneWidget);
+      },
+    );
+
+    testWidgets('loads stored checkup result by ID from repository', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final detail = CheckupDetail(
+        id: 'hist-123',
+        userId: 'usr-1',
+        status: 'completed',
+        overallScore: 0.9,
+        createdAt: '2026-02-15T09:30:00Z',
+        overallCategory: 'Healthy',
+        symptoms: {
+          'complaint_type': 'general',
+          'severity': 1.0,
+          'duration_days': 1.0,
+        },
+        patientData: {
+          'heart_rate': 68.0,
+          'systolic_bp': 115.0,
+          'diastolic_bp': 75.0,
+          'spo2': 99.0,
+          'temperature': 36.7,
+        },
+        symptomResult: {'class_name': 'Normal', 'confidence': 0.95},
+        patientResult: {'class_name': 'Low Risk', 'confidence': 0.98},
+      );
+
+      final mockRepo = MockCheckupRepository(detailToReturn: detail);
+      final container = ProviderContainer(
+        overrides: [checkupRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(
+          const ResultScreen(checkupId: 'hist-123'),
+          container: container,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your Health Screening'), findsOneWidget);
+      expect(find.text('68.0 bpm'), findsOneWidget);
+      expect(find.text('115.0/75.0 mmHg'), findsOneWidget);
+      // For historical results, button says "Back to History"
+      expect(find.text('Back to History'), findsOneWidget);
+    });
+
+    testWidgets('handles missing stored checkup gracefully', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockRepo = MockCheckupRepository(detailToReturn: null);
+      final container = ProviderContainer(
+        overrides: [checkupRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(
+          const ResultScreen(checkupId: 'missing-id'),
+          container: container,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkup result not available'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+    });
+  });
+
+  // ── Item 7a: History Screen ────────────────────────────────────────────────
+
+  group('Item 7a: HistoryScreen', () {
+    const testUser = User(
+      id: 'usr-test-123',
+      appMetadata: {},
+      userMetadata: {},
+      aud: 'authenticated',
+      createdAt: '2026-01-01T00:00:00Z',
+    );
+
+    testWidgets('renders empty state when no checkups are found', (
+      tester,
+    ) async {
+      final mockRepo = MockCheckupRepository(historyToReturn: const []);
+      final container = ProviderContainer(
+        overrides: [
+          checkupRepositoryProvider.overrideWithValue(mockRepo),
+          currentUserProvider.overrideWithValue(testUser),
+        ],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const HistoryScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Checkup History'), findsOneWidget);
+      expect(find.text('View your previous health checkups'), findsOneWidget);
+      expect(find.text('No checkups yet'), findsOneWidget);
+      expect(
+        find.text(
+          'Complete a health checkup and your results will appear here.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'renders list of checkups with original formatting and badges',
+      (tester) async {
+        final history = [
+          const CheckupSummary(
+            id: 'chk-1',
+            userId: 'usr-test-123',
+            status: 'completed',
+            overallScore: 0.92,
+            createdAt: '2026-03-10T14:30:00Z',
+            overallCategory: 'Healthy',
+            confidence: 0.88,
+            completeness: 1.0,
+          ),
+          const CheckupSummary(
+            id: 'chk-2',
+            userId: 'usr-test-123',
+            status: 'completed',
+            overallScore: 0.74,
+            createdAt: '2026-02-15T09:00:00Z',
+            overallCategory: 'Cardio Risk',
+            confidence: 0.75,
+            completeness: 0.85,
+          ),
+        ];
+
+        final mockRepo = MockCheckupRepository(historyToReturn: history);
+        final container = ProviderContainer(
+          overrides: [
+            checkupRepositoryProvider.overrideWithValue(mockRepo),
+            currentUserProvider.overrideWithValue(testUser),
+          ],
+        );
+
+        await tester.pumpWidget(
+          buildCheckupTestApp(const HistoryScreen(), container: container),
+        );
+        await tester.pumpAndSettle();
+
+        // Screen title
+        expect(find.text('Checkup History'), findsOneWidget);
+
+        // First item
+        expect(find.text('10 Mar 2026'), findsOneWidget);
+        expect(find.text('Healthy'), findsOneWidget);
+        expect(find.text('88%'), findsOneWidget);
+        expect(find.text('100%'), findsOneWidget);
+
+        // Second item
+        expect(find.text('15 Feb 2026'), findsOneWidget);
+        expect(find.text('Cardio Risk'), findsOneWidget);
+        expect(find.text('75%'), findsOneWidget);
+        expect(find.text('85%'), findsOneWidget);
+
+        // Common labels & badges
+        expect(find.text('Completed'), findsNWidgets(2));
+        expect(find.text('AI screening result available'), findsNWidgets(2));
+        expect(find.text('View screening result  →'), findsNWidgets(2));
+
+        // Tapping card triggers navigation
+        await tester.tap(find.text('Healthy'));
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets('renders error state and retries on button click', (
+      tester,
+    ) async {
+      final mockRepo = MockCheckupRepository(shouldThrow: true);
+      final container = ProviderContainer(
+        overrides: [
+          checkupRepositoryProvider.overrideWithValue(mockRepo),
+          currentUserProvider.overrideWithValue(testUser),
+        ],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const HistoryScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unable to load history'), findsOneWidget);
+      expect(find.text('Retry'), findsOneWidget);
+    });
+  });
+
+  // ── Item 7b: Assistant Screen ───────────────────────────────────────────────
+
+  group('Item 7b: AssistantScreen', () {
+    testWidgets('renders header, initial welcome message, and chips', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockRepo = MockAssistantRepository();
+      final container = ProviderContainer(
+        overrides: [assistantRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const AssistantScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('AI Health Assistant'), findsOneWidget);
+      expect(find.text('AI'), findsOneWidget);
+      expect(find.text('Understand your Health360 results'), findsOneWidget);
+
+      // Initial welcome message
+      expect(
+        find.textContaining('Ask me about your screening status'),
+        findsOneWidget,
+      );
+
+      // Prompt chips
+      expect(find.text('✦ Explain my result'), findsOneWidget);
+      expect(find.text('⚠ What are my warning signs?'), findsOneWidget);
+      expect(find.text('What does confidence mean?'), findsOneWidget);
+
+      // Disclaimer
+      expect(
+        find.textContaining(
+          'Health360 AI provides guidance, not a medical diagnosis.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'displays active checkup context banner when checkupId is provided',
+      (tester) async {
+        tester.view.physicalSize = const Size(1080, 2400);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final mockRepo = MockAssistantRepository();
+        final container = ProviderContainer(
+          overrides: [assistantRepositoryProvider.overrideWithValue(mockRepo)],
+        );
+
+        await tester.pumpWidget(
+          buildCheckupTestApp(
+            const AssistantScreen(checkupId: 'chk-ctx-12345'),
+            container: container,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('CURRENT HEALTH360 SCREENING'), findsOneWidget);
+        expect(find.text('Recent screening result'), findsOneWidget);
+      },
+    );
+
+    testWidgets('sends user message and displays assistant response bubble', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockRepo = MockAssistantRepository(
+        responseToReturn: const AssistantResponse(
+          status: 'completed',
+          message: 'Your resting heart rate of 72 bpm is in the normal range.',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [assistantRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const AssistantScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      // Enter text
+      final inputField = find.byType(TextField);
+      await tester.enterText(inputField, 'Is my heart rate normal?');
+
+      // Send message
+      final sendButton = find.byIcon(Icons.arrow_upward);
+      await tester.tap(sendButton);
+      await tester.pumpAndSettle();
+
+      // Verified: message sent to repository
+      expect(mockRepo.lastMessage, 'Is my heart rate normal?');
+
+      // Verified: bubbles displayed
+      expect(find.text('Is my heart rate normal?'), findsOneWidget);
+      expect(
+        find.text('Your resting heart rate of 72 bpm is in the normal range.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('quick prompt chip triggers message send', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockRepo = MockAssistantRepository(
+        responseToReturn: const AssistantResponse(
+          status: 'completed',
+          message: 'Confidence represents model certainty.',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [assistantRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const AssistantScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap chip
+      final chipFinder = find.text('What does confidence mean?');
+      await tester.ensureVisible(chipFinder);
+      await tester.tap(chipFinder);
+      await tester.pumpAndSettle();
+
+      expect(
+        mockRepo.lastMessage,
+        'What does my confidence and uncertainty mean?',
+      );
+      expect(
+        find.text('Confidence represents model certainty.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('handles error response gracefully without crashing', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final mockRepo = MockAssistantRepository(shouldThrow: true);
+      final container = ProviderContainer(
+        overrides: [assistantRepositoryProvider.overrideWithValue(mockRepo)],
+      );
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const AssistantScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      final inputField = find.byType(TextField);
+      await tester.enterText(inputField, 'Check my result');
+      await tester.tap(find.byIcon(Icons.arrow_upward));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Something went wrong while connecting to Health360 AI. Please try again.',
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+}
+
+// ── Mock CheckupRepository for unit/widget testing ───────────────────────────
+
+class MockCheckupRepository implements CheckupRepository {
+  MockCheckupRepository({
+    this.responseToReturn,
+    this.detailToReturn,
+    this.historyToReturn,
+    this.shouldThrow = false,
+  });
+
+  final CheckupResponse? responseToReturn;
+  final CheckupDetail? detailToReturn;
+  final List<CheckupSummary>? historyToReturn;
+  final bool shouldThrow;
+
+  CheckupDraft? lastSubmittedDraft;
+  MultipartFile? lastImageOverride;
+
+  @override
+  SupabaseClient get supabaseClient => throw UnimplementedError();
+
+  @override
+  ApiClient get apiClient => throw UnimplementedError();
+
+  @override
+  Future<CheckupSummary?> getLatestCheckup(String userId) async => null;
+
+  @override
+  Future<List<CheckupSummary>> getCheckupHistory(String userId) async {
+    if (shouldThrow) {
+      throw const ApiException(statusCode: 500, message: 'DB error');
+    }
+    return historyToReturn ?? [];
+  }
+
+  @override
+  Future<CheckupDetail?> getCheckupDetail({
+    required String checkupId,
+    String? userId,
+  }) async {
+    if (shouldThrow) {
+      throw const ApiException(statusCode: 500, message: 'DB error');
+    }
+    return detailToReturn;
+  }
+
+  @override
+  Future<CheckupResponse> submitCheckup(
+    CheckupDraft draft, {
+    MultipartFile? imageFileOverride,
+  }) async {
+    if (shouldThrow) {
+      throw const ApiException(
+        statusCode: 500,
+        message: 'Submission failed on server',
+      );
+    }
+    lastSubmittedDraft = draft;
+    lastImageOverride = imageFileOverride;
+    return responseToReturn ??
+        const CheckupResponse(
+          status: 'completed',
+          assessment: Assessment(finding: 'Normal', confidence: 0.95),
+          screening: ScreeningInterpretation(
+            mainConcern: 'General health check',
+            overallStatus: 'COMPLETED',
+            screeningSummary: 'All values within normal range.',
+            vitalsInterpretation: 'Normal vitals',
+            nextSteps: 'Maintain healthy lifestyle.',
+            overallExplanation: 'AI assessment complete.',
+          ),
+          symptomResult: ModelResult(
+            className: 'General Checkup',
+            confidence: 0.9,
+          ),
+          patientResult: ModelResult(className: 'Low Risk', confidence: 0.92),
+          uncertainty: UncertaintyResult(
+            confidence: 0.9,
+            uncertainty: 0.1,
+            completeness: 1.0,
+          ),
+        );
+  }
+}
+
+// ── Mock AssistantRepository for unit/widget testing ─────────────────────────
+
+class MockAssistantRepository implements AssistantRepository {
+  MockAssistantRepository({this.responseToReturn, this.shouldThrow = false});
+
+  final AssistantResponse? responseToReturn;
+  final bool shouldThrow;
+  String? lastMessage;
+  String? lastCheckupId;
+
+  @override
+  Future<AssistantResponse> chat({
+    required String message,
+    String? checkupId,
+  }) async {
+    if (shouldThrow) {
+      throw const ApiException(
+        statusCode: 500,
+        message: 'Assistant service temporarily unavailable',
+      );
+    }
+    lastMessage = message;
+    lastCheckupId = checkupId;
+    return responseToReturn ??
+        const AssistantResponse(
+          status: 'completed',
+          message: 'This is an AI health screening response.',
+        );
+  }
 }
