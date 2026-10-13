@@ -219,8 +219,8 @@ Item <N>: <name>. Kotlin files: <paths>. Read them first, then implement in ./he
 
 ## 9. Progress checklist
 
-- [ ] 1. Flutter scaffold, theme, router + auth guard, config, Android manifests
-- [ ] 2. Models, Supabase client, dio client (token + refresh), repositories, `CheckupDraft`, `/health` smoke test
+- [x] 1. Flutter scaffold, theme, router + auth guard, config, Android manifests
+- [x] 2. Models, Supabase client, dio client (token + refresh), repositories, `CheckupDraft`, `/health` smoke test
 - [ ] 3a. Login
 - [ ] 3b. Register (with Q1 fix)
 - [ ] 3c. Forgot password + Reset password (deep link)
