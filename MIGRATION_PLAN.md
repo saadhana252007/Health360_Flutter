@@ -226,10 +226,10 @@ Item <N>: <name>. Kotlin files: <paths>. Read them first, then implement in ./he
 - [x] 3c. Forgot password + Reset password (deep link)
 - [x] 4a. Bottom-nav shell + Home
 - [x] 4b. Profile
-- [ ] 5a. Patient info
-- [ ] 5b. Symptoms
-- [ ] 5c. Vitals
-- [ ] 5d. Image input
+- [x] 5a. Patient info
+- [x] 5b. Symptoms
+- [x] 5c. Vitals
+- [x] 5d. Image input
 - [ ] 6a. Submit (with and without image)
 - [ ] 6b. Result screen (live + stored)
 - [ ] 7a. History

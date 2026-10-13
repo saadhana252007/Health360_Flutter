@@ -7,7 +7,11 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/reset_password_screen.dart';
 import '../features/auth/splash_screen.dart';
+import '../features/image/image_input_screen.dart';
+import '../features/patient/patient_info_screen.dart';
 import '../features/shell/home_shell.dart';
+import '../features/symptoms/symptoms_screen.dart';
+import '../features/vitals/vitals_screen.dart';
 import '../state/auth_provider.dart';
 
 // ── Route paths ───────────────────────────────────────────────────────────────
@@ -21,6 +25,10 @@ abstract final class AppRoutes {
   static const String resetPassword = '/login/reset';
 
   static const String home = '/home';
+  static const String patientInfo = '/checkup/patient';
+  static const String symptoms = '/checkup/symptoms';
+  static const String vitals = '/checkup/vitals';
+  static const String imageInput = '/checkup/image';
 }
 
 // ── Router provider ───────────────────────────────────────────────────────────
@@ -105,6 +113,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, _) => const ResetPasswordScreen(),
       ),
       GoRoute(path: AppRoutes.home, builder: (context, _) => const HomeShell()),
+      GoRoute(
+        path: AppRoutes.patientInfo,
+        builder: (context, state) => PatientInfoScreen(
+          editFromProfile:
+              state.uri.queryParameters['edit_from_profile'] == 'true',
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.symptoms,
+        builder: (context, _) => const SymptomsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.vitals,
+        builder: (context, _) => const VitalsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.imageInput,
+        builder: (context, _) => const ImageInputScreen(),
+      ),
     ],
   );
 });

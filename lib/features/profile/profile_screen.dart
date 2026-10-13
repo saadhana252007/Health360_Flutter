@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/router.dart';
 import '../../data/models/profile.dart';
 import '../../data/repositories/auth_repo.dart';
 import '../../data/repositories/profile_repo.dart';
@@ -86,13 +88,8 @@ class ProfileScreen extends ConsumerWidget {
                   height: 50,
                   child: ElevatedButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Profile editing will be available in item 5a (Patient Info).',
-                          ),
-                          duration: Duration(seconds: 2),
-                        ),
+                      context.push(
+                        '${AppRoutes.patientInfo}?edit_from_profile=true',
                       );
                     },
                     style: ElevatedButton.styleFrom(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/router.dart';
 import '../../data/models/checkup_summary.dart';
 import '../../data/models/profile.dart';
 import '../../data/repositories/checkup_repo.dart';
@@ -490,12 +492,7 @@ class HomeScreen extends ConsumerWidget {
 
   // ── Handlers & Helpers ────────────────────────────────────────────────────
   void _onStartCheckup(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Checkup flow will be available in item 5.'),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    context.push(AppRoutes.patientInfo);
   }
 
   static String _getGreeting() {

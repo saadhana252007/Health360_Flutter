@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:health360ai/app/router.dart';
 import 'package:health360ai/data/models/profile.dart';
 import 'package:health360ai/data/models/symptoms_vitals.dart';
@@ -12,7 +13,11 @@ import 'package:health360ai/features/auth/register_screen.dart';
 import 'package:health360ai/features/auth/reset_password_screen.dart';
 import 'package:health360ai/features/shell/home_shell.dart';
 import 'package:health360ai/features/home/home_screen.dart';
+import 'package:health360ai/features/image/image_input_screen.dart';
+import 'package:health360ai/features/patient/patient_info_screen.dart';
 import 'package:health360ai/features/profile/profile_screen.dart';
+import 'package:health360ai/features/symptoms/symptoms_screen.dart';
+import 'package:health360ai/features/vitals/vitals_screen.dart';
 import 'package:health360ai/state/checkup_draft_provider.dart';
 
 void main() {
@@ -1026,6 +1031,619 @@ void main() {
       );
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Logout'), findsNWidgets(3));
+    });
+  });
+
+  // ── Item 5 Test Router Helper ──────────────────────────────────────────────
+
+  Widget buildCheckupTestApp(Widget screen, {ProviderContainer? container}) {
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(path: '/', builder: (_, _) => screen),
+        GoRoute(path: AppRoutes.symptoms, builder: (_, _) => const SizedBox()),
+        GoRoute(path: AppRoutes.vitals, builder: (_, _) => const SizedBox()),
+        GoRoute(
+          path: AppRoutes.imageInput,
+          builder: (_, _) => const SizedBox(),
+        ),
+      ],
+    );
+
+    final app = MaterialApp.router(routerConfig: router);
+    if (container != null) {
+      return UncontrolledProviderScope(container: container, child: app);
+    }
+    return ProviderScope(child: app);
+  }
+
+  // ── Item 5a: Patient Information Screen ────────────────────────────────────
+
+  group('Item 5a: PatientInfoScreen', () {
+    testWidgets('renders patient form fields and buttons', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const PatientInfoScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Patient Information'), findsOneWidget);
+      expect(find.text('Full Name'), findsOneWidget);
+      expect(find.text('Date of Birth'), findsOneWidget);
+      expect(find.text('Sex'), findsOneWidget);
+      expect(find.text('Height'), findsOneWidget);
+      expect(find.text('Weight'), findsOneWidget);
+      expect(find.text('Save and Continue'), findsOneWidget);
+    });
+
+    testWidgets('validates required fields with exact error messages', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const PatientInfoScreen()));
+      await tester.pumpAndSettle();
+
+      // 1. Empty name
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(SnackBar, 'Enter your full name'),
+        findsOneWidget,
+      );
+
+      // Enter name (first TextField)
+      await tester.enterText(find.byType(TextField).at(0), 'Jane Doe');
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(SnackBar, 'Select your date of birth'),
+        findsOneWidget,
+      );
+
+      // Pick date of birth
+      await tester.tap(find.byIcon(Icons.calendar_today_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // Empty sex validation
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(SnackBar, 'Select your sex'), findsOneWidget);
+
+      // Select sex
+      await tester.tap(find.text('Select sex'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Female').last);
+      await tester.pumpAndSettle();
+
+      // Height empty
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(SnackBar, 'Enter a valid height'),
+        findsOneWidget,
+      );
+
+      // Enter valid height (second TextField)
+      await tester.enterText(find.byType(TextField).at(1), '168');
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.widgetWithText(SnackBar, 'Enter a valid weight'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('pre-populates from draft and updates CheckupDraft on save', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final container = ProviderContainer();
+      const initialProfile = Profile(
+        id: 'patient-1',
+        fullName: 'John Smith',
+        dateOfBirth: '1990-01-01',
+        sex: 'Male',
+        heightCm: 175.0,
+        weightKg: 70.0,
+      );
+      container.read(checkupDraftProvider.notifier).setPatient(initialProfile);
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const PatientInfoScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('John Smith'), findsOneWidget);
+      expect(find.text('01-01-1990'), findsOneWidget);
+      expect(find.text('175'), findsOneWidget);
+      expect(find.text('70'), findsOneWidget);
+
+      // Modify weight (third TextField)
+      await tester.enterText(find.byType(TextField).at(2), '72.5');
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+
+      final updated = container.read(checkupDraftProvider).patient;
+      expect(updated, isNotNull);
+      expect(updated!.fullName, 'John Smith');
+      expect(updated.weightKg, 72.5);
+    });
+  });
+
+  // ── Item 5b: Symptoms Screen ───────────────────────────────────────────────
+
+  group('Item 5b: SymptomsScreen', () {
+    testWidgets('renders all questions and sections', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const SymptomsScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Symptoms'), findsOneWidget);
+      expect(find.text('Tell us about your current symptoms'), findsOneWidget);
+      expect(find.text('How severe is your symptom?'), findsOneWidget);
+      expect(find.text('How long have you had it?'), findsOneWidget);
+      expect(find.text('How often are you experiencing it?'), findsOneWidget);
+      expect(find.text('How is the symptom changing?'), findsOneWidget);
+      expect(
+        find.text('What type of concern are you describing?'),
+        findsOneWidget,
+      );
+      expect(find.text('What does the symptom feel like?'), findsOneWidget);
+      expect(
+        find.text('Does anything make it worse or bring it on?'),
+        findsOneWidget,
+      );
+      expect(find.text('Associated symptoms'), findsOneWidget);
+      expect(find.text('Symptoms before it'), findsOneWidget);
+      expect(find.text('Symptoms after it'), findsOneWidget);
+      expect(find.text('Save and Continue'), findsOneWidget);
+    });
+
+    testWidgets('validates required fields with exact messages in order', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const SymptomsScreen()));
+      await tester.pumpAndSettle();
+
+      // 1. Severity empty
+      await tester.ensureVisible(find.text('Save and Continue'));
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a severity between 0 and 10'), findsOneWidget);
+
+      // Severity > 10
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Rate from 0 to 10'),
+        '15',
+      );
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a severity between 0 and 10'), findsOneWidget);
+
+      // Valid severity 6
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Rate from 0 to 10'),
+        '6',
+      );
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a valid duration'), findsOneWidget);
+
+      // Valid duration 4 -> next error is complaint type (validated before frequency)
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Number of days'),
+        '4',
+      );
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Select the type of concern'), findsOneWidget);
+    });
+
+    testWidgets('dynamic site options switch when complaint type changes', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const SymptomsScreen()));
+      await tester.pumpAndSettle();
+
+      // Default complaint type is null. Select Skin concern:
+      await tester.ensureVisible(find.text('Skin concern'));
+      await tester.tap(find.text('Skin concern'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Face'), findsOneWidget);
+      expect(find.text('Scalp'), findsOneWidget);
+      expect(find.text('Neck'), findsOneWidget);
+
+      // Switch to Oral / Dental concern
+      await tester.ensureVisible(find.text('Oral / Dental concern'));
+      await tester.tap(find.text('Oral / Dental concern'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Teeth'), findsOneWidget);
+      expect(find.text('Gums'), findsOneWidget);
+      expect(find.text('Tongue'), findsOneWidget);
+      expect(find.text('Face'), findsNothing);
+    });
+
+    testWidgets('saves full SymptomsPayload into CheckupDraft', (tester) async {
+      tester.view.physicalSize = const Size(1080, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final container = ProviderContainer();
+      await tester.pumpWidget(
+        buildCheckupTestApp(const SymptomsScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      // Severity 7
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Rate from 0 to 10'),
+        '7',
+      );
+      // Duration 3
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Number of days'),
+        '3',
+      );
+      // Frequency: Rarely
+      await tester.ensureVisible(find.text('Rarely'));
+      await tester.tap(find.text('Rarely'));
+      await tester.pumpAndSettle();
+
+      // Progression: Getting worse
+      await tester.ensureVisible(find.text('Getting worse'));
+      await tester.tap(find.text('Getting worse'));
+      await tester.pumpAndSettle();
+
+      // Complaint type: General symptom
+      await tester.ensureVisible(find.text('General symptom'));
+      await tester.tap(find.text('General symptom'));
+      await tester.pumpAndSettle();
+
+      // Location: Chest
+      await tester.ensureVisible(find.text('Chest'));
+      await tester.tap(find.text('Chest'));
+      await tester.pumpAndSettle();
+
+      // Character: Sharp
+      await tester.ensureVisible(find.text('Sharp'));
+      await tester.tap(find.text('Sharp'));
+      await tester.pumpAndSettle();
+
+      // Triggers: Stress & Exercise
+      await tester.ensureVisible(find.text('Stress'));
+      await tester.tap(find.text('Stress'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Exercise'));
+      await tester.tap(find.text('Exercise'));
+      await tester.pumpAndSettle();
+
+      // Associated: Fatigue
+      await tester.ensureVisible(find.text('Fatigue').first);
+      await tester.tap(find.text('Fatigue').first);
+      await tester.pumpAndSettle();
+
+      // Save
+      await tester.ensureVisible(find.text('Save and Continue'));
+      await tester.tap(find.text('Save and Continue'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(checkupDraftProvider).symptoms;
+      expect(saved, isNotNull);
+      expect(saved!.severity, 7.0);
+      expect(saved.durationDays, 3.0);
+      expect(saved.complaintType, 'general');
+      expect(saved.frequency, 1.0);
+      expect(saved.progression, 2.0);
+      expect(saved.site, 'chest');
+      expect(saved.character, 1.0);
+      expect(saved.trigger, 2.0); // 2 triggers selected
+      expect(saved.associatedSymptoms, contains('Fatigue'));
+    });
+  });
+
+  // ── Item 5c: Vitals Screen ─────────────────────────────────────────────────
+
+  group('Item 5c: VitalsScreen', () {
+    testWidgets('renders vitals inputs and labels', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const VitalsScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Vital Information'), findsOneWidget);
+      expect(find.text('Heart Rate'), findsOneWidget);
+      expect(find.text('Systolic BP'), findsOneWidget);
+      expect(find.text('Diastolic BP'), findsOneWidget);
+      expect(find.text('Oxygen Saturation (SpO₂)'), findsOneWidget);
+      expect(find.text('Body Temperature'), findsOneWidget);
+      expect(find.text('Activity Level'), findsOneWidget);
+      expect(find.text('Tobacco Use'), findsOneWidget);
+      expect(find.text('Alcohol Consumption'), findsOneWidget);
+      expect(find.text('Continue'), findsOneWidget);
+    });
+
+    testWidgets('validates vital inputs with exact order and messages', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const VitalsScreen()));
+      await tester.pumpAndSettle();
+
+      // Select all three dropdowns FIRST before triggering any validation
+      // (avoids SnackBar overlay blocking dropdown hit-tests)
+      final dropdowns = find.byType(DropdownButton<String>);
+
+      await tester.tap(dropdowns.at(0)); // Activity Level
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Moderate').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(dropdowns.at(1)); // Tobacco Use
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('No').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(dropdowns.at(2)); // Alcohol Consumption
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('No').last);
+      await tester.pumpAndSettle();
+
+      // 1. Empty numeric fields -> complete all vital information
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Please complete all vital information'),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      // Fill HR invalid (< 30)
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 72'), '25');
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 120'), '120');
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 80'), '80');
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 98'), '98');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'e.g. 36.6'),
+        '36.6',
+      );
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Please enter a valid heart rate'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      // Systolic invalid (< 70)
+      await tester.enterText(find.widgetWithText(TextField, '25'), '72');
+      await tester.enterText(find.widgetWithText(TextField, '120'), '65');
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Please enter a valid systolic blood pressure'),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      // Diastolic invalid (< 40)
+      await tester.enterText(find.widgetWithText(TextField, '65'), '120');
+      await tester.enterText(find.widgetWithText(TextField, '80'), '35');
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Please enter a valid diastolic blood pressure'),
+        findsOneWidget,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      // SpO2 invalid (< 70)
+      await tester.enterText(find.widgetWithText(TextField, '35'), '80');
+      await tester.enterText(find.widgetWithText(TextField, '98'), '60');
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('SpO₂ must be between 70% and 100%'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      // Temperature invalid (< 30)
+      await tester.enterText(find.widgetWithText(TextField, '60'), '98');
+      await tester.enterText(find.widgetWithText(TextField, '36.6'), '28');
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Please enter a valid body temperature between 30°C and 45°C',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('saves VitalsPayload with correct discrete encodings', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final container = ProviderContainer();
+      await tester.pumpWidget(
+        buildCheckupTestApp(const VitalsScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 72'), '76');
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 120'), '125');
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 80'), '82');
+      await tester.enterText(find.widgetWithText(TextField, 'e.g. 98'), '99');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'e.g. 36.6'),
+        '37.1',
+      );
+
+      // Open Activity Level dropdown (index 0) and pick High
+      final dropdownsBtns = find.byType(DropdownButton<String>);
+      await tester.tap(dropdownsBtns.at(0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('High').last);
+      await tester.pumpAndSettle();
+
+      // Open Tobacco dropdown (index 1) and pick Yes
+      await tester.tap(dropdownsBtns.at(1));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Yes').last);
+      await tester.pumpAndSettle();
+
+      // Open Alcohol dropdown (index 2) and pick No
+      await tester.tap(dropdownsBtns.at(2));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('No').last);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+
+      final saved = container.read(checkupDraftProvider).vitals;
+      expect(saved, isNotNull);
+      expect(saved!.heartRate, 76.0);
+      expect(saved.systolicBp, 125.0);
+      expect(saved.diastolicBp, 82.0);
+      expect(saved.spo2, 99.0);
+      expect(saved.temperature, 37.1);
+      expect(saved.activityLevel, 2); // High -> 2
+      expect(saved.tobacco, 1); // Yes -> 1
+      expect(saved.alcohol, 0); // No -> 0
+    });
+  });
+
+  // ── Item 5d: Image Input Screen ────────────────────────────────────────────
+
+  group('Item 5d: ImageInputScreen', () {
+    testWidgets('renders image type dropdown and actions', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const ImageInputScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Image Check'), findsOneWidget);
+      expect(
+        find.text('Upload an image for AI-assisted analysis'),
+        findsOneWidget,
+      );
+      expect(find.text('Image Type'), findsOneWidget);
+      expect(find.text('Take Photo'), findsOneWidget);
+      expect(find.text('Choose from Gallery'), findsOneWidget);
+      expect(find.text('Skip Image'), findsOneWidget);
+      expect(find.text('Continue'), findsOneWidget);
+    });
+
+    testWidgets('validates missing image type and missing image', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildCheckupTestApp(const ImageInputScreen()));
+      await tester.pumpAndSettle();
+
+      // Tap Continue without selecting type -> shows snackbar
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Select an image type'), findsOneWidget);
+
+      // Dismiss snackbar, then select type 'Skin'
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Select image type'));
+      await tester.tap(find.text('Select image type'), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Skin').last);
+      await tester.pumpAndSettle();
+
+      // Tap Continue without selecting image -> shows snackbar
+      await tester.ensureVisible(find.text('Continue'));
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Select or capture an image'), findsOneWidget);
+    });
+
+    testWidgets('Skip Image clears image from draft', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final container = ProviderContainer();
+      container
+          .read(checkupDraftProvider.notifier)
+          .setImage(path: 'dummy/path.jpg', imageType: 'skin');
+      expect(container.read(checkupDraftProvider).imagePath, 'dummy/path.jpg');
+
+      await tester.pumpWidget(
+        buildCheckupTestApp(const ImageInputScreen(), container: container),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Skip Image'));
+      await tester.tap(find.text('Skip Image'));
+      await tester.pumpAndSettle();
+
+      expect(container.read(checkupDraftProvider).imagePath, isNull);
+      expect(container.read(checkupDraftProvider).imageType, isNull);
+      expect(
+        find.textContaining('Continuing without image analysis'),
+        findsOneWidget,
+      );
     });
   });
 }
