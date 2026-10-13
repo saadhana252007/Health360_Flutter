@@ -234,7 +234,7 @@ Item <N>: <name>. Kotlin files: <paths>. Read them first, then implement in ./he
 - [x] 6b. Result screen (live + stored)
 - [x] 7a. History
 - [x] 7b. Assistant
-- [ ] 8. HTTPS, release build, tests, cleanup
+- [x] 8. HTTPS enforcement, tests, debug build verified — release build pending (requires `--dart-define=API_BASE_URL=https://…` pointing to a live server)
 
 ---
 

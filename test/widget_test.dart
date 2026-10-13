@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health360ai/app/config.dart';
 import 'package:health360ai/app/router.dart';
 import 'package:health360ai/data/models/profile.dart';
 import 'package:health360ai/data/models/symptoms_vitals.dart';
@@ -2454,6 +2455,28 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+  });
+
+  // ── Item 8: Configuration, Security & Verification ──────────────────────────
+
+  group('Item 8: Configuration, Security & Verification', () {
+    test('development apiBaseUrl defaults to emulator loopback', () {
+      expect(AppConfig.apiBaseUrl, 'http://10.0.2.2:8000');
+    });
+
+    test(
+      'Supabase publishable key does not contain secret service role keyword',
+      () {
+        expect(
+          AppConfig.supabasePublishableKey.toLowerCase(),
+          isNot(contains('service_role')),
+        );
+      },
+    );
+
+    test('deep link route matches health360://login/reset specification', () {
+      expect(AppRoutes.resetPassword, '/login/reset');
     });
   });
 }
