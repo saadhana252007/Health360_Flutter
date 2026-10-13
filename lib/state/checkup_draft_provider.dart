@@ -124,5 +124,5 @@ class CheckupDraftNotifier extends Notifier<CheckupDraft> {
 
 final checkupDraftProvider =
     NotifierProvider<CheckupDraftNotifier, CheckupDraft>(
-  CheckupDraftNotifier.new,
-);
+      CheckupDraftNotifier.new,
+    );

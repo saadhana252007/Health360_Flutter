@@ -33,9 +33,7 @@ Future<void> main() async {
 
   runApp(
     // ProviderScope is required for Riverpod.
-    const ProviderScope(
-      child: Health360App(),
-    ),
+    const ProviderScope(child: Health360App()),
   );
 }
 

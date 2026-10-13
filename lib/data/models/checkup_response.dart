@@ -33,7 +33,8 @@ class CheckupResponse {
           : const Assessment(),
       screening: json['screening'] != null
           ? ScreeningInterpretation.fromJson(
-              json['screening'] as Map<String, dynamic>)
+              json['screening'] as Map<String, dynamic>,
+            )
           : null,
       imageResult: json['image_result'] != null
           ? ImageResult.fromJson(json['image_result'] as Map<String, dynamic>)
@@ -46,7 +47,8 @@ class CheckupResponse {
           : null,
       uncertainty: json['uncertainty'] != null
           ? UncertaintyResult.fromJson(
-              json['uncertainty'] as Map<String, dynamic>)
+              json['uncertainty'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -85,8 +87,7 @@ class ImageResult {
     return ImageResult(
       type: json['type'] as String?,
       prediction: json['prediction'] != null
-          ? ImagePrediction.fromJson(
-              json['prediction'] as Map<String, dynamic>)
+          ? ImagePrediction.fromJson(json['prediction'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -212,9 +213,9 @@ class AssistantRequest {
   final String? checkupId;
 
   Map<String, dynamic> toJson() => {
-        'message': message,
-        if (checkupId != null) 'checkup_id': checkupId,
-      };
+    'message': message,
+    if (checkupId != null) 'checkup_id': checkupId,
+  };
 }
 
 /// Response from POST /api/v1/assistant/chat.
@@ -257,10 +258,7 @@ double? _toDoubleOpt(dynamic v) {
 Map<String, double> _toProbMap(dynamic v) {
   if (v == null) return const {};
   if (v is Map) {
-    return {
-      for (final e in v.entries)
-        e.key.toString(): _toDouble(e.value),
-    };
+    return {for (final e in v.entries) e.key.toString(): _toDouble(e.value)};
   }
   return const {};
 }

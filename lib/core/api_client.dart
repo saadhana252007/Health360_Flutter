@@ -3,8 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 // Hide MultipartFile because supabase_flutter also exports one.
-import 'package:supabase_flutter/supabase_flutter.dart'
-    hide MultipartFile;
+import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
 
 import '../app/config.dart';
 import '../data/models/checkup_response.dart';
@@ -84,12 +83,8 @@ class _AuthInterceptor extends Interceptor {
   bool _isRetrying = false;
 
   @override
-  void onRequest(
-    RequestOptions options,
-    RequestInterceptorHandler handler,
-  ) {
-    final token =
-        Supabase.instance.client.auth.currentSession?.accessToken;
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final token = Supabase.instance.client.auth.currentSession?.accessToken;
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -139,42 +134,43 @@ ApiException mapDioError(DioException e) {
 
   return switch (status) {
     401 => const ApiException(
-        statusCode: 401,
-        message: 'Your session has expired. Please log in again.',
-      ),
+      statusCode: 401,
+      message: 'Your session has expired. Please log in again.',
+    ),
     400 => ApiException(
-        statusCode: 400,
-        message: detail ?? 'Invalid request. Please check your input.',
-      ),
+      statusCode: 400,
+      message: detail ?? 'Invalid request. Please check your input.',
+    ),
     413 => ApiException(
-        statusCode: 413,
-        message: detail ?? 'Image file is too large (max 10 MB).',
-      ),
+      statusCode: 413,
+      message: detail ?? 'Image file is too large (max 10 MB).',
+    ),
     503 => ApiException(
-        statusCode: 503,
-        message: detail ?? 'AI model is temporarily unavailable. Please try again shortly.',
-      ),
+      statusCode: 503,
+      message:
+          detail ??
+          'AI model is temporarily unavailable. Please try again shortly.',
+    ),
     500 => const ApiException(
-        statusCode: 500,
-        message: 'Server error. Please try again later.',
-      ),
+      statusCode: 500,
+      message: 'Server error. Please try again later.',
+    ),
     _ => switch (e.type) {
-        DioExceptionType.connectionTimeout ||
-        DioExceptionType.sendTimeout ||
-        DioExceptionType.receiveTimeout =>
-          const ApiException(
-            statusCode: 0,
-            message: 'Request timed out. Check your connection and try again.',
-          ),
-        DioExceptionType.connectionError => const ApiException(
-            statusCode: 0,
-            message: 'Could not reach the server. Check your connection.',
-          ),
-        _ => ApiException(
-            statusCode: status,
-            message: e.message ?? 'An unexpected error occurred.',
-          ),
-      }
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout => const ApiException(
+        statusCode: 0,
+        message: 'Request timed out. Check your connection and try again.',
+      ),
+      DioExceptionType.connectionError => const ApiException(
+        statusCode: 0,
+        message: 'Could not reach the server. Check your connection.',
+      ),
+      _ => ApiException(
+        statusCode: status,
+        message: e.message ?? 'An unexpected error occurred.',
+      ),
+    },
   };
 }
 
@@ -209,10 +205,7 @@ class ApiClient {
     try {
       final res = await _dio.post<Map<String, dynamic>>(
         'api/v1/checkups/analyze',
-        data: {
-          'symptoms': symptoms,
-          'patient': patient,
-        },
+        data: {'symptoms': symptoms, 'patient': patient},
       );
       return CheckupResponse.fromJson(res.data!);
     } on DioException catch (e) {

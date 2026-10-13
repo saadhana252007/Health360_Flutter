@@ -51,9 +51,7 @@ class CheckupRepository {
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    return rows
-        .map((r) => CheckupSummary.fromJson(r))
-        .toList();
+    return rows.map((r) => CheckupSummary.fromJson(r)).toList();
   }
 
   /// Returns the full detail row for [checkupId] belonging to [userId], or null.

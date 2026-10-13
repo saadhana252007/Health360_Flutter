@@ -224,8 +224,8 @@ Item <N>: <name>. Kotlin files: <paths>. Read them first, then implement in ./he
 - [x] 3a. Login
 - [x] 3b. Register (with Q1 fix)
 - [x] 3c. Forgot password + Reset password (deep link)
-- [ ] 4a. Bottom-nav shell + Home
-- [ ] 4b. Profile
+- [x] 4a. Bottom-nav shell + Home
+- [x] 4b. Profile
 - [ ] 5a. Patient info
 - [ ] 5b. Symptoms
 - [ ] 5c. Vitals

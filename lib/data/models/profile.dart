@@ -42,23 +42,23 @@ class Profile {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'full_name': fullName,
-        'date_of_birth': dateOfBirth,
-        'sex': sex,
-        'height_cm': heightCm,
-        'weight_kg': weightKg,
-      };
+    'id': id,
+    'full_name': fullName,
+    'date_of_birth': dateOfBirth,
+    'sex': sex,
+    'height_cm': heightCm,
+    'weight_kg': weightKg,
+  };
 
   /// Builds the `patient` payload that is sent inside a checkup request body.
   /// Vitals are merged in by [CheckupDraftNotifier] before submission.
   Map<String, dynamic> toPatientPayload() => {
-        'full_name': fullName,
-        'date_of_birth': dateOfBirth,
-        'sex': sex,
-        'height_cm': heightCm,
-        'weight_kg': weightKg,
-      };
+    'full_name': fullName,
+    'date_of_birth': dateOfBirth,
+    'sex': sex,
+    'height_cm': heightCm,
+    'weight_kg': weightKg,
+  };
 
   /// Populate from a Supabase [User]'s metadata (used during onboarding when
   /// the `profiles` row may not exist yet — Q1 fix path).
@@ -105,7 +105,8 @@ class Profile {
           weightKg == other.weightKg;
 
   @override
-  int get hashCode => Object.hash(id, fullName, dateOfBirth, sex, heightCm, weightKg);
+  int get hashCode =>
+      Object.hash(id, fullName, dateOfBirth, sex, heightCm, weightKg);
 }
 
 double _toDouble(dynamic v) {

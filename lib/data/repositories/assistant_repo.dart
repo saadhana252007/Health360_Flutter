@@ -19,14 +19,8 @@ class AssistantRepository {
   /// [message] — the user's chat message.
   /// [checkupId] — optional; pass when the chat is opened from a result screen
   ///   so the assistant has context about that specific checkup.
-  Future<AssistantResponse> chat({
-    required String message,
-    String? checkupId,
-  }) {
-    return _apiClient.assistantChat(
-      message: message,
-      checkupId: checkupId,
-    );
+  Future<AssistantResponse> chat({required String message, String? checkupId}) {
+    return _apiClient.assistantChat(message: message, checkupId: checkupId);
   }
 }
 

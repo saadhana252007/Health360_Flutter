@@ -150,9 +150,7 @@ ThemeData buildAppTheme() {
         foregroundColor: Colors.white,
         disabledBackgroundColor: AppColors.primary.withAlpha(102),
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         minimumSize: const Size(double.infinity, 54),
         textStyle: const TextStyle(
           fontSize: 16,
@@ -167,14 +165,9 @@ ThemeData buildAppTheme() {
       style: OutlinedButton.styleFrom(
         foregroundColor: AppColors.primary,
         side: const BorderSide(color: AppColors.primary, width: 1.5),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         minimumSize: const Size(double.infinity, 54),
-        textStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -182,10 +175,7 @@ ThemeData buildAppTheme() {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary,
-        textStyle: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -214,10 +204,7 @@ ThemeData buildAppTheme() {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
-      hintStyle: const TextStyle(
-        color: AppColors.textHint,
-        fontSize: 14,
-      ),
+      hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
       errorStyle: const TextStyle(color: AppColors.error, fontSize: 12),
     ),
 
@@ -240,10 +227,7 @@ ThemeData buildAppTheme() {
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
       elevation: 8,
-      selectedLabelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
+      selectedLabelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       unselectedLabelStyle: TextStyle(fontSize: 12),
     ),
 

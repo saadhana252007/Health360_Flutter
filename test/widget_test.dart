@@ -10,6 +10,9 @@ import 'package:health360ai/data/models/checkup_response.dart';
 import 'package:health360ai/features/auth/login_screen.dart';
 import 'package:health360ai/features/auth/register_screen.dart';
 import 'package:health360ai/features/auth/reset_password_screen.dart';
+import 'package:health360ai/features/shell/home_shell.dart';
+import 'package:health360ai/features/home/home_screen.dart';
+import 'package:health360ai/features/profile/profile_screen.dart';
 import 'package:health360ai/state/checkup_draft_provider.dart';
 
 void main() {
@@ -727,6 +730,302 @@ void main() {
       await tester.pump();
 
       expect(find.text('Enter a password'), findsAtLeast(1));
+    });
+  });
+
+  // ── Item 4a: HomeShell & HomeScreen ────────────────────────────────────────
+
+  group('Item 4a: HomeShell', () {
+    testWidgets('renders all 4 bottom navigation items', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            homeProfileProvider.overrideWith((ref) => Future.value(null)),
+            homeLatestCheckupProvider.overrideWith((ref) => Future.value(null)),
+            profileScreenProvider.overrideWith((ref) => Future.value(null)),
+          ],
+          child: const MaterialApp(home: HomeShell()),
+        ),
+      );
+
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('History'), findsOneWidget);
+      expect(find.text('Assistant'), findsOneWidget);
+      expect(find.text('Profile'), findsOneWidget);
+    });
+
+    testWidgets('switches tab on navigation item tap', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          homeProfileProvider.overrideWith((ref) => Future.value(null)),
+          homeLatestCheckupProvider.overrideWith((ref) => Future.value(null)),
+          profileScreenProvider.overrideWith((ref) => Future.value(null)),
+        ],
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: HomeShell()),
+        ),
+      );
+
+      // Initially on Home (index 0)
+      expect(container.read(activeTabProvider), 0);
+
+      // Tap Profile
+      await tester.tap(find.text('Profile'));
+      await tester.pump();
+      expect(container.read(activeTabProvider), 3);
+
+      // Tap Assistant
+      await tester.tap(find.text('Assistant'));
+      await tester.pump();
+      expect(container.read(activeTabProvider), 2);
+
+      // Tap History
+      await tester.tap(find.text('History'));
+      await tester.pump();
+      expect(container.read(activeTabProvider), 1);
+    });
+  });
+
+  group('Item 4a: HomeScreen', () {
+    testWidgets('renders empty state overview and cards', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            homeProfileProvider.overrideWith((ref) => Future.value(null)),
+            homeLatestCheckupProvider.overrideWith((ref) => Future.value(null)),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Start a Health Checkup'), findsOneWidget);
+      expect(find.text('AI-POWERED MULTIMODAL SCREENING'), findsOneWidget);
+      expect(find.text('Symptoms'), findsNWidgets(2)); // Chip and overview tile
+      expect(find.text('Vitals'), findsOneWidget);
+      expect(find.text('Images'), findsOneWidget);
+      expect(find.text('Start Health Checkup  →'), findsOneWidget);
+
+      expect(find.text('Your Health Overview'), findsOneWidget);
+      expect(find.text('Overall Health'), findsOneWidget);
+      expect(find.text('Not assessed'), findsNWidgets(2));
+      expect(find.text('Last Checkup'), findsOneWidget);
+      expect(find.text('No checkups yet'), findsNWidgets(2));
+      expect(find.text('Not recorded'), findsOneWidget);
+
+      expect(find.text('Health360 AI Assistant'), findsOneWidget);
+      expect(find.text('Ask Assistant'), findsOneWidget);
+      expect(find.text("Today's Health Tip"), findsOneWidget);
+      expect(
+        find.text(
+          'Stay hydrated and remember to take regular breaks during the day.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('renders populated profile and checkup data', (tester) async {
+      const mockProfile = Profile(
+        id: 'u1',
+        fullName: 'Saadhana',
+        dateOfBirth: '1998-05-20',
+        sex: 'female',
+        heightCm: 168.0,
+        weightKg: 55.0,
+      );
+
+      const mockCheckup = CheckupSummary(
+        id: 'c1',
+        userId: 'u1',
+        status: 'completed',
+        overallScore: 0.85,
+        createdAt: '2026-10-12T10:00:00Z',
+        overallCategory: 'moderate',
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            homeProfileProvider.overrideWith(
+              (ref) => Future.value(mockProfile),
+            ),
+            homeLatestCheckupProvider.overrideWith(
+              (ref) => Future.value(mockCheckup),
+            ),
+          ],
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Saadhana'), findsOneWidget);
+      expect(find.text('S'), findsOneWidget);
+      expect(find.text('85%'), findsOneWidget);
+      expect(find.text('12 Oct 2026'), findsOneWidget);
+      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('Moderate'), findsOneWidget);
+      expect(find.text('Latest health checkup'), findsOneWidget);
+      expect(find.text('Start another checkup  →'), findsOneWidget);
+    });
+
+    testWidgets('tapping Ask Assistant switches tab to Assistant (index 2)', (
+      tester,
+    ) async {
+      final container = ProviderContainer(
+        overrides: [
+          homeProfileProvider.overrideWith((ref) => Future.value(null)),
+          homeLatestCheckupProvider.overrideWith((ref) => Future.value(null)),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(home: HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Ask Assistant'));
+      await tester.tap(find.text('Ask Assistant'));
+      await tester.pump();
+
+      expect(container.read(activeTabProvider), 2);
+    });
+  });
+
+  // ── Item 4b: ProfileScreen ─────────────────────────────────────────────────
+
+  group('Item 4b: ProfileScreen', () {
+    const mockProfile = Profile(
+      id: 'u1',
+      fullName: 'Saadhana Patel',
+      dateOfBirth: '1995-06-15',
+      sex: 'female',
+      heightCm: 165.0,
+      weightKg: 60.0,
+      createdAt: '2026-01-15T00:00:00Z',
+    );
+
+    testWidgets('renders personal health details and account info', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            profileScreenProvider.overrideWith(
+              (ref) => Future.value(mockProfile),
+            ),
+          ],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('My Profile'), findsOneWidget);
+      expect(find.text('Saadhana Patel'), findsNWidgets(2));
+      expect(find.text('June 15, 1995'), findsOneWidget);
+      expect(find.text('female'), findsOneWidget);
+      expect(find.text('165 cm'), findsOneWidget);
+      expect(find.text('60 kg'), findsOneWidget);
+      expect(find.text('January 15, 2026'), findsOneWidget);
+      expect(find.text('Edit Personal Information'), findsOneWidget);
+      expect(find.text('Privacy & Security'), findsOneWidget);
+      expect(find.text('About Health360'), findsOneWidget);
+      expect(find.text('v1.0.0'), findsOneWidget);
+      expect(find.text('Logout'), findsOneWidget);
+    });
+
+    testWidgets('Privacy & Security row opens dialog', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            profileScreenProvider.overrideWith(
+              (ref) => Future.value(mockProfile),
+            ),
+          ],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Privacy & Security'));
+      await tester.tap(find.text('Privacy & Security'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Your Health360 account is protected using Supabase Authentication.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Close'), findsOneWidget);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Your Health360 account is protected'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('About Health360 row opens dialog', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            profileScreenProvider.overrideWith(
+              (ref) => Future.value(mockProfile),
+            ),
+          ],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('About Health360'));
+      await tester.tap(find.text('About Health360'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Health360 AI is a modular AI-powered personal health checkup',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Close'), findsOneWidget);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Logout button opens confirmation dialog', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            profileScreenProvider.overrideWith(
+              (ref) => Future.value(mockProfile),
+            ),
+          ],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Logout'));
+      await tester.tap(find.text('Logout'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Are you sure you want to logout from your Health360 account?',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Logout'), findsNWidgets(3));
     });
   });
 }

@@ -16,6 +16,15 @@ final authSessionProvider = StreamProvider<Session?>((ref) {
   );
 });
 
+/// Exposes the current Supabase [User] (or null when signed out or uninitialized).
+final currentUserProvider = Provider<User?>((ref) {
+  try {
+    return Supabase.instance.client.auth.currentUser;
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Tracks whether the app is currently in password-recovery mode.
 ///
 /// When an [AuthChangeEvent.passwordRecovery] event arrives from a deep link,

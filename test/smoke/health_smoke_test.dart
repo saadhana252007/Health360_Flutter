@@ -52,8 +52,11 @@ void main() {
       expect(response.statusCode, 200);
       expect(response.data, isNotNull);
       // The backend returns {"status": "healthy"} or similar.
-      expect(response.data!.containsKey('status'), isTrue,
-          reason: 'Response body must contain a "status" key');
+      expect(
+        response.data!.containsKey('status'),
+        isTrue,
+        reason: 'Response body must contain a "status" key',
+      );
 
       print('[PASS] /health → ${response.data}');
     });

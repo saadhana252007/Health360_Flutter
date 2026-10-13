@@ -30,10 +30,7 @@ class AuthRepository {
     required String email,
     required String password,
   }) {
-    return _client.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
+    return _client.auth.signInWithPassword(email: email, password: password);
   }
 
   // ── Sign-up ──────────────────────────────────────────────────────────────────
@@ -74,9 +71,7 @@ class AuthRepository {
   /// session. Uses 8+ characters (Q2 fix: both register and reset use the same
   /// 8-char minimum; the Kotlin app used 6 for reset which was a bug).
   Future<UserResponse> updatePassword(String newPassword) {
-    return _client.auth.updateUser(
-      UserAttributes(password: newPassword),
-    );
+    return _client.auth.updateUser(UserAttributes(password: newPassword));
   }
 
   // ── Sign-out ─────────────────────────────────────────────────────────────────

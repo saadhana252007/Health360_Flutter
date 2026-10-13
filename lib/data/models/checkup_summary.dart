@@ -47,19 +47,23 @@ class CheckupSummary {
       completeness: _toDoubleOpt(json['completeness']),
       screening: json['screening'] != null
           ? ScreeningSummary.fromJson(
-              (json['screening'] as Map<String, dynamic>))
+              (json['screening'] as Map<String, dynamic>),
+            )
           : null,
       imageResult: json['image_result'] != null
           ? ImageHistoryResult.fromJson(
-              json['image_result'] as Map<String, dynamic>)
+              json['image_result'] as Map<String, dynamic>,
+            )
           : null,
       symptomResult: json['symptom_result'] != null
           ? ModelHistoryResult.fromJson(
-              json['symptom_result'] as Map<String, dynamic>)
+              json['symptom_result'] as Map<String, dynamic>,
+            )
           : null,
       patientResult: json['patient_result'] != null
           ? ModelHistoryResult.fromJson(
-              json['patient_result'] as Map<String, dynamic>)
+              json['patient_result'] as Map<String, dynamic>,
+            )
           : null,
     );
   }
@@ -108,7 +112,8 @@ class ImageHistoryResult {
       type: json['type'] as String?,
       prediction: json['prediction'] != null
           ? ImageHistoryPrediction.fromJson(
-              json['prediction'] as Map<String, dynamic>)
+              json['prediction'] as Map<String, dynamic>,
+            )
           : null,
     );
   }

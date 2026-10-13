@@ -48,18 +48,18 @@ class SymptomsPayload {
 
   /// Converts to the JSON map sent in the `symptoms` key of the API request.
   Map<String, dynamic> toJson() => {
-        'complaint_type': complaintType,
-        'severity': severity,
-        'duration_days': durationDays,
-        'frequency': frequency,
-        'progression': progression,
-        'site': site,
-        'character': character,
-        'trigger': trigger,
-        'associated_symptoms': associatedSymptoms,
-        'pre_symptoms': preSymptoms,
-        'post_symptoms': postSymptoms,
-      };
+    'complaint_type': complaintType,
+    'severity': severity,
+    'duration_days': durationDays,
+    'frequency': frequency,
+    'progression': progression,
+    'site': site,
+    'character': character,
+    'trigger': trigger,
+    'associated_symptoms': associatedSymptoms,
+    'pre_symptoms': preSymptoms,
+    'post_symptoms': postSymptoms,
+  };
 }
 
 /// Vitals data, included inside the `patient` payload (merged with
@@ -80,24 +80,24 @@ class VitalsPayload {
     required this.alcohol,
   });
 
-  final double heartRate;    // 30–220
-  final double systolicBp;   // 70–250
-  final double diastolicBp;  // 40–150
-  final double spo2;         // 70–100
-  final double temperature;  // 30–45 °C
-  final int activityLevel;   // 0=Low, 1=Moderate, 2=High
-  final int tobacco;         // 0=No, 1=Yes
-  final int alcohol;         // 0=No, 1=Yes
+  final double heartRate; // 30–220
+  final double systolicBp; // 70–250
+  final double diastolicBp; // 40–150
+  final double spo2; // 70–100
+  final double temperature; // 30–45 °C
+  final int activityLevel; // 0=Low, 1=Moderate, 2=High
+  final int tobacco; // 0=No, 1=Yes
+  final int alcohol; // 0=No, 1=Yes
 
   /// Converts to the JSON map merged into the `patient` key.
   Map<String, dynamic> toJson() => {
-        'heart_rate': heartRate,
-        'systolic_bp': systolicBp,
-        'diastolic_bp': diastolicBp,
-        'spo2': spo2,
-        'temperature': temperature,
-        'activity_level': activityLevel,
-        'tobacco': tobacco,
-        'alcohol': alcohol,
-      };
+    'heart_rate': heartRate,
+    'systolic_bp': systolicBp,
+    'diastolic_bp': diastolicBp,
+    'spo2': spo2,
+    'temperature': temperature,
+    'activity_level': activityLevel,
+    'tobacco': tobacco,
+    'alcohol': alcohol,
+  };
 }
